@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Audio Tools</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { background: #0a0a0a; }
+
+    :root {
+      --bg:          #0a0a0a;
+      --surface:     #141414;
+      --border:      #303030;
+      --text:        #f0f0f0;
+      --muted:       #555555;
+      --accent:      #ffffff;
+      --accent-dark: #cccccc;
+      --accent2:     #999999;
+      --accent2-dark:#777777;
+      --accent3:     #bbbbbb;
+      --accent3-dark:#999999;
+      --danger:      #ff4d4d;
+      --radius:      0px;
+    }
+
+    /* ── video background ── */
+    #bgVideo {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      transform: scale(1.35);
+      transform-origin: center center;
+      z-index: -1;
+      opacity: 1;
+      pointer-events: none;
+    }
+
+    body {
+      background: transparent;
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      gap: 1.5rem;
+    }
+
+    /* ── page title ── */
+    .page-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.45);
+      text-align: center;
+    }
+
+    /* ── grid ── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1.5rem;
+      width: 100%;
+      max-width: 1400px;
+      align-items: start;
+    }
+
+    @media (max-width: 1200px) {
+      .grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 640px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+
+    /* ── card (liquid glass) ── */
+    .card {
+      background: rgba(255, 255, 255, 0.025);
+      backdrop-filter: blur(28px) saturate(160%) brightness(1.08);
+      -webkit-backdrop-filter: blur(28px) saturate(160%) brightness(1.08);
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      padding: 1.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      position: relative;
+      overflow: hidden;
+      box-shadow:
+        inset 0 1.5px 0 rgba(255, 255, 255, 0.22),
+        inset 1px 0 0 rgba(255, 255, 255, 0.07),
+        inset -1px 0 0 rgba(255, 255, 255, 0.03),
+        0 24px 64px rgba(0, 0, 0, 0.55),
+        0 1px 0 rgba(255, 255, 255, 0.06);
+    }
+
+    /* specular highlight — simulates curved glass catching light */
+    .card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        140deg,
+        rgba(255, 255, 255, 0.09) 0%,
+        rgba(255, 255, 255, 0.03) 25%,
+        transparent 50%,
+        transparent 75%,
+        rgba(255, 255, 255, 0.025) 100%
+      );
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* keep all card children above the pseudo overlay */
+    .card > * { position: relative; z-index: 1; }
+
+    /* ── card header ── */
+    .card-header { display: flex; flex-direction: column; gap: 0.2rem; }
+
+    .card-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.6rem;
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -0.02em;
+    }
+    .card-title.yellow,
+    .card-title.teal,
+    .card-title.orange  { color: #ffffff; }
+
+    .card-sub {
+      font-size: 0.68rem;
+      color: rgba(255,255,255,0.45);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    /* ── pixel icons ── */
+    .drop-icon {
+      display: block;
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 0.85rem;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      shape-rendering: crispEdges;
+    }
+
+    /* ── dropzone ── */
+    .dropzone {
+      border: 1px dashed rgba(255, 255, 255, 0.15);
+      padding: 2rem 1.25rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      position: relative;
+      background: rgba(0, 0, 0, 0.25);
+    }
+    .dropzone:hover, .dropzone.dragover { background: rgba(255,255,255,0.04); }
+    .dropzone.dragover-yellow  { border-color: var(--accent); }
+    .dropzone.dragover-teal    { border-color: var(--accent2); }
+    .dropzone.dragover-orange  { border-color: var(--accent3); }
+    .dropzone input {
+      position: absolute; inset: 0; opacity: 0;
+      cursor: pointer; width: 100%; height: 100%;
+    }
+    .drop-label  { font-size: 0.75rem; color: rgba(255,255,255,0.45); line-height: 1.6; }
+    .drop-label strong { color: #ffffff; display: block; font-size: 0.82rem; margin-bottom: 0.2rem; }
+    .file-name   { margin-top: 0.6rem; font-size: 0.7rem; word-break: break-all; }
+    .file-name.yellow,
+    .file-name.teal,
+    .file-name.orange  { color: #ffffff; }
+
+    /* ── section label ── */
+    .section-label {
+      font-size: 0.68rem;
+      color: #ffffff;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+      display: block;
+    }
+
+    /* ── speed buttons ── */
+    .speed-options {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.4rem;
+    }
+    .speed-btn {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      color: #ffffff;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.82rem;
+      padding: 0.55rem 0;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-weight: 500;
+    }
+    .speed-btn:hover { border-color: #ffffff; background: rgba(255,255,255,0.08); }
+    .speed-btn.active { border-color: #ffffff; background: #ffffff; color: #0a0a0a; }
+
+    /* ── word input ── */
+    .word-input {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      color: #ffffff;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.82rem;
+      padding: 0.65rem 0.85rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .word-input:focus  { border-color: #ffffff; }
+    #wordInput3:focus  { border-color: #ffffff; }
+    .word-input::placeholder { color: rgba(255,255,255,0.3); }
+
+    .input-hint {
+      font-size: 0.65rem;
+      color: #ffffff;
+      margin-top: 0.35rem;
+    }
+
+    /* ── sliders ── */
+    .tolerance-row,
+    .silence-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .tolerance-row input[type=range],
+    .silence-row input[type=range] {
+      flex: 1;
+      -webkit-appearance: none;
+      height: 3px;
+      background: rgba(255,255,255,0.2);
+      outline: none;
+      cursor: pointer;
+    }
+    .tolerance-row input[type=range]::-webkit-slider-thumb,
+    .silence-row   input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: #ffffff;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+    .tolerance-row input[type=range]::-webkit-slider-thumb:hover,
+    .silence-row   input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+    .tolerance-val {
+      font-size: 0.82rem;
+      color: #ffffff;
+      min-width: 3.5rem;
+      text-align: right;
+    }
+    .gap-val {
+      font-size: 0.82rem;
+      color: #ffffff;
+      min-width: 3.5rem;
+      text-align: right;
+    }
+
+    /* ── buttons ── */
+    .btn {
+      border: none;
+      font-family: 'Syne', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      padding: 0.85rem;
+      cursor: pointer;
+      width: 100%;
+      transition: background 0.15s, transform 0.1s;
+      text-transform: uppercase;
+    }
+    .btn:active:not(:disabled) { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .btn.yellow, .btn.teal, .btn.orange { background: #ffffff; color: #0a0a0a; }
+    .btn.yellow:hover:not(:disabled),
+    .btn.teal:hover:not(:disabled),
+    .btn.orange:hover:not(:disabled)  { background: rgba(255,255,255,0.85); }
+
+    /* ── status ── */
+    .status {
+      font-size: 0.72rem;
+      text-align: center;
+      min-height: 1.1rem;
+      letter-spacing: 0.05em;
+    }
+    .status.loading                        { color: rgba(255,255,255,0.4); }
+    .status.error                          { color: var(--danger); }
+    .status.success-yellow,
+    .status.success-teal,
+    .status.success-orange                 { color: #ffffff; }
+
+    /* ── spinner ── */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      display: inline-block;
+      width: 0.7rem; height: 0.7rem;
+      border: 2px solid rgba(255,255,255,0.2);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      vertical-align: middle;
+      margin-right: 0.4rem;
+    }
+    .spinner.yellow, .spinner.teal, .spinner.orange { border-top-color: #ffffff; }
+
+    /* ── sound buttons ── */
+    .sound-options {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.4rem;
+    }
+    .sound-btn {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      color: #ffffff;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.7rem;
+      padding: 0.55rem 0.25rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .sound-btn:hover  { border-color: #ffffff; background: rgba(255,255,255,0.08); }
+    .sound-btn.active { border-color: #ffffff; background: #ffffff; color: #0a0a0a; }
+  </style>
+</head>
+<body>
+
+  <video id="bgVideo" autoplay muted loop playsinline>
+    <source src="bg.webm" type="video/webm">
+  </video>
+
+  <p class="page-title">BRILHA, MEU CREATOR &lt;3</p>
+
+  <div class="grid">
+
+    <!-- ══ MODULE 1: SPEED ══ -->
+    <div class="card">
+      <div class="card-header">
+        <h1 class="card-title yellow">SPEED</h1>
+        <p class="card-sub">acelere sem mudar o tom</p>
+      </div>
+
+      <div class="dropzone" id="dz1">
+        <input type="file" id="file1" accept="audio/*,video/*" />
+        <!-- SPEED: lightning bolt -->
+        <svg class="drop-icon" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg" fill="white">
+          <rect x="4" y="1" width="2" height="1"/>
+          <rect x="3" y="2" width="2" height="1"/>
+          <rect x="2" y="3" width="2" height="1"/>
+          <rect x="1" y="4" width="9" height="1"/>
+          <rect x="6" y="5" width="3" height="1"/>
+          <rect x="5" y="6" width="3" height="1"/>
+          <rect x="4" y="7" width="3" height="1"/>
+          <rect x="4" y="8" width="2" height="1"/>
+        </svg>
+        <div class="drop-label">
+          <strong>Arraste ou clique para escolher</strong>
+          MP3, MP4, WAV, M4A…
+        </div>
+        <div class="file-name yellow" id="fname1"></div>
+      </div>
+
+      <div>
+        <span class="section-label">Velocidade</span>
+        <div class="speed-options">
+          <button class="speed-btn" data-speed="1.25">1.25×</button>
+          <button class="speed-btn active" data-speed="1.5">1.5×</button>
+          <button class="speed-btn" data-speed="1.75">1.75×</button>
+          <button class="speed-btn" data-speed="2">2×</button>
+        </div>
+      </div>
+
+      <button class="btn yellow" id="btn1" disabled>Processar</button>
+      <div class="status" id="status1"></div>
+    </div>
+
+    <!-- ══ MODULE 2: SEARCH & CUT ══ -->
+    <div class="card">
+      <div class="card-header">
+        <h1 class="card-title teal">WORD CROP</h1>
+        <p class="card-sub">Faça cortes com palavras e frases específicas.</p>
+      </div>
+
+      <div class="dropzone" id="dz2">
+        <input type="file" id="file2" accept="audio/*,video/*" />
+        <!-- WORD CROP: [HOLA] in 3×5 pixel font, two rows -->
+        <svg class="drop-icon" viewBox="0 0 11 12" xmlns="http://www.w3.org/2000/svg" fill="white">
+          <!-- " opening -->
+          <rect x="0" y="0" width="1" height="2"/>
+          <rect x="2" y="0" width="1" height="2"/>
+          <!-- H -->
+          <rect x="4" y="0" width="1" height="5"/>
+          <rect x="6" y="0" width="1" height="5"/>
+          <rect x="5" y="2" width="1" height="1"/>
+          <!-- O -->
+          <rect x="8" y="0" width="3" height="1"/>
+          <rect x="8" y="1" width="1" height="3"/>
+          <rect x="10" y="1" width="1" height="3"/>
+          <rect x="8" y="4" width="3" height="1"/>
+          <!-- L -->
+          <rect x="0" y="7" width="1" height="5"/>
+          <rect x="1" y="11" width="2" height="1"/>
+          <!-- A -->
+          <rect x="4" y="7" width="3" height="1"/>
+          <rect x="4" y="8" width="1" height="4"/>
+          <rect x="6" y="8" width="1" height="4"/>
+          <rect x="5" y="9" width="1" height="1"/>
+          <!-- " closing (superscript — topo da segunda linha) -->
+          <rect x="8" y="7" width="1" height="2"/>
+          <rect x="10" y="7" width="1" height="2"/>
+        </svg>
+        <div class="drop-label">
+          <strong>Arraste ou clique para escolher</strong>
+          MP3, MP4, WAV, M4A…
+        </div>
+        <div class="file-name teal" id="fname2"></div>
+      </div>
+
+      <div>
+        <span class="section-label">Palavras / frases</span>
+        <input
+          class="word-input"
+          id="wordInput"
+          type="text"
+          placeholder="workflow, quarto agente, poder"
+        />
+        <p class="input-hint">Separe múltiplas buscas por vírgula. Frases são suportadas.</p>
+      </div>
+
+      <div>
+        <span class="section-label">
+          Tolerância &nbsp;—&nbsp; <span id="tolLabel">0.3s</span> antes e depois
+        </span>
+        <div class="tolerance-row">
+          <input type="range" id="tolSlider" min="0.1" max="1.0" step="0.1" value="0.3" />
+          <span class="tolerance-val" id="tolVal">0.3s</span>
+        </div>
+      </div>
+
+      <button class="btn teal" id="btn2" disabled>Buscar e Cortar</button>
+      <div class="status" id="status2"></div>
+    </div>
+
+    <!-- ══ MODULE 4: SILENCE CUT ══ -->
+    <div class="card">
+      <div class="card-header">
+        <h1 class="card-title orange">SILENCE CUT</h1>
+        <p class="card-sub">elimine pausas longas</p>
+      </div>
+
+      <div class="dropzone" id="dz4">
+        <input type="file" id="file4" accept="audio/*,video/*" />
+        <!-- SILENCE CUT: 8-bit scissors, 2px blades -->
+        <svg class="drop-icon" viewBox="0 0 12 11" xmlns="http://www.w3.org/2000/svg" fill="white">
+          <!-- blade tips (2px wide, far apart) -->
+          <rect x="1" y="0" width="2" height="1"/>
+          <rect x="9" y="0" width="2" height="1"/>
+          <!-- blades converging (2px wide) -->
+          <rect x="2" y="1" width="2" height="1"/>
+          <rect x="8" y="1" width="2" height="1"/>
+          <rect x="3" y="2" width="2" height="1"/>
+          <rect x="7" y="2" width="2" height="1"/>
+          <!-- near pivot (blades almost touching) -->
+          <rect x="4" y="3" width="4" height="1"/>
+          <!-- pivot — narrowest point -->
+          <rect x="5" y="4" width="2" height="1"/>
+          <!-- post-pivot (blades cross and splay out) -->
+          <rect x="4" y="5" width="4" height="1"/>
+          <rect x="3" y="6" width="2" height="1"/>
+          <rect x="7" y="6" width="2" height="1"/>
+          <rect x="2" y="7" width="2" height="1"/>
+          <rect x="8" y="7" width="2" height="1"/>
+          <!-- handle rings -->
+          <rect x="1" y="8" width="3" height="1"/>
+          <rect x="8" y="8" width="3" height="1"/>
+          <rect x="1" y="9" width="1" height="1"/>
+          <rect x="3" y="9" width="1" height="1"/>
+          <rect x="8" y="9" width="1" height="1"/>
+          <rect x="10" y="9" width="1" height="1"/>
+          <rect x="1" y="10" width="3" height="1"/>
+          <rect x="8" y="10" width="3" height="1"/>
+        </svg>
+        <div class="drop-label">
+          <strong>Arraste ou clique para escolher</strong>
+          MP3, MP4, WAV, M4A…
+        </div>
+        <div class="file-name orange" id="fname4"></div>
+      </div>
+
+      <div>
+        <span class="section-label">
+          Pausa entre falas &nbsp;—&nbsp; <span id="gapLabel">0.15s</span>
+        </span>
+        <div class="silence-row">
+          <input type="range" id="gapSlider" min="0.05" max="0.5" step="0.05" value="0.15" />
+          <span class="gap-val" id="gapVal">0.15s</span>
+        </div>
+      </div>
+
+      <button class="btn orange" id="btn4" disabled>Remover Silêncios</button>
+      <div class="status" id="status4"></div>
+    </div>
+
+    <!-- ══ MODULE 3: CENSOR ══ -->
+    <div class="card">
+      <div class="card-header">
+        <h1 class="card-title orange">CENSOR</h1>
+        <p class="card-sub">censure palavras com som</p>
+      </div>
+
+      <div class="dropzone" id="dz3">
+        <input type="file" id="file3" accept="audio/*,video/*" />
+        <!-- CENSOR: speaker + censor bars -->
+        <svg class="drop-icon" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg" fill="white">
+          <rect x="3" y="1" width="1" height="1"/>
+          <rect x="2" y="2" width="2" height="1"/>
+          <rect x="1" y="3" width="3" height="1"/>
+          <rect x="0" y="4" width="4" height="1"/>
+          <rect x="0" y="5" width="4" height="1"/>
+          <rect x="0" y="6" width="4" height="1"/>
+          <rect x="0" y="7" width="4" height="1"/>
+          <rect x="1" y="8" width="3" height="1"/>
+          <rect x="2" y="9" width="2" height="1"/>
+          <rect x="3" y="10" width="1" height="1"/>
+          <!-- X symbol (2px wide diagonals) -->
+          <rect x="5" y="3" width="2" height="1"/>
+          <rect x="10" y="3" width="2" height="1"/>
+          <rect x="6" y="4" width="2" height="1"/>
+          <rect x="9" y="4" width="2" height="1"/>
+          <rect x="7" y="5" width="3" height="1"/>
+          <rect x="7" y="6" width="3" height="1"/>
+          <rect x="6" y="7" width="2" height="1"/>
+          <rect x="9" y="7" width="2" height="1"/>
+          <rect x="5" y="8" width="2" height="1"/>
+          <rect x="10" y="8" width="2" height="1"/>
+        </svg>
+        <div class="drop-label">
+          <strong>Arraste ou clique para escolher</strong>
+          MP3, MP4, WAV, M4A…
+        </div>
+        <div class="file-name orange" id="fname3"></div>
+      </div>
+
+      <div>
+        <span class="section-label">Palavras / frases</span>
+        <input
+          class="word-input"
+          id="wordInput3"
+          type="text"
+          placeholder="merda, caralho, maldoso"
+          style="--focus-color: var(--accent3)"
+        />
+        <p class="input-hint">Separe múltiplas buscas por vírgula.</p>
+      </div>
+
+      <div>
+        <span class="section-label">Som de censura</span>
+        <div class="sound-options">
+          <button class="sound-btn active" data-sound="beep">Bip</button>
+          <button class="sound-btn" data-sound="metal">Metal Gear</button>
+          <button class="sound-btn" data-sound="buzzer">Buzzer</button>
+          <button class="sound-btn" data-sound="quack">Quack</button>
+        </div>
+      </div>
+
+      <button class="btn orange" id="btn3" disabled>Censurar</button>
+      <div class="status" id="status3"></div>
+    </div>
+
+  </div>
+
+  <script>
+  // ── Module 1: Speed ──────────────────────────────────────────────────────
+
+  let file1 = null, speed = 1.5;
+
+  setupDropzone("dz1", "file1", (f) => {
+    file1 = f;
+    document.getElementById("fname1").textContent = f.name;
+    document.getElementById("btn1").disabled = false;
+  }, "yellow");
+
+  document.querySelectorAll(".speed-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".speed-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      speed = parseFloat(btn.dataset.speed);
+    });
+  });
+
+  document.getElementById("btn1").addEventListener("click", async () => {
+    if (!file1) return;
+    const form = new FormData();
+    form.append("audio", file1);
+    form.append("speed", speed);
+    await submit({
+      url: "/process", form,
+      btn: "btn1", statusEl: "status1",
+      spinnerClass: "yellow", successClass: "success-yellow",
+      filename: (orig) => `${stem(orig)}_${speed}x${ext(orig)}`
+    });
+  });
+
+  // ── Module 2: Word Cut ───────────────────────────────────────────────────
+
+  let file2 = null;
+
+  setupDropzone("dz2", "file2", (f) => {
+    file2 = f;
+    document.getElementById("fname2").textContent = f.name;
+    updateBtn2();
+  }, "teal");
+
+  document.getElementById("wordInput").addEventListener("input", updateBtn2);
+
+  function updateBtn2() {
+    const hasFile  = !!file2;
+    const hasWords = document.getElementById("wordInput").value.trim().length > 0;
+    document.getElementById("btn2").disabled = !(hasFile && hasWords);
+  }
+
+  // Tolerance slider
+  const tolSlider = document.getElementById("tolSlider");
+  const tolVal    = document.getElementById("tolVal");
+  const tolLabel  = document.getElementById("tolLabel");
+  tolSlider.addEventListener("input", () => {
+    const v = parseFloat(tolSlider.value).toFixed(1) + "s";
+    tolVal.textContent = v;
+    tolLabel.textContent = v;
+  });
+
+  document.getElementById("btn2").addEventListener("click", async () => {
+    if (!file2) return;
+    const words     = document.getElementById("wordInput").value.trim();
+    const tolerance = tolSlider.value;
+    const form = new FormData();
+    form.append("audio", file2);
+    form.append("words", words);
+    form.append("tolerance", tolerance);
+    await submit({
+      url: "/search-cut", form,
+      btn: "btn2", statusEl: "status2",
+      spinnerClass: "teal", successClass: "success-teal",
+      loadingMsg: "transcrevendo e cortando…",
+      filename: (orig) => `${stem(orig)}_cuts.zip`
+    });
+  });
+
+  // ── shared helpers ───────────────────────────────────────────────────────
+
+  function setupDropzone(dzId, inputId, onFile, colorClass) {
+    const dz    = document.getElementById(dzId);
+    const input = document.getElementById(inputId);
+    dz.addEventListener("dragover",  e => { e.preventDefault(); dz.classList.add("dragover", `dragover-${colorClass}`); });
+    dz.addEventListener("dragleave", ()  => dz.classList.remove("dragover", `dragover-${colorClass}`));
+    dz.addEventListener("drop", e => {
+      e.preventDefault();
+      dz.classList.remove("dragover", `dragover-${colorClass}`);
+      const f = e.dataTransfer.files[0];
+      if (f) onFile(f);
+    });
+    input.addEventListener("change", () => { if (input.files[0]) onFile(input.files[0]); });
+  }
+
+  async function submit({ url, form, btn, statusEl, spinnerClass, successClass, loadingMsg, filename }) {
+    const btnEl    = document.getElementById(btn);
+    const statusEl_ = document.getElementById(statusEl);
+    btnEl.disabled = true;
+    statusEl_.className = "status loading";
+    statusEl_.innerHTML = `<span class="spinner ${spinnerClass}"></span>${loadingMsg || "processando…"}`;
+
+    try {
+      const res = await fetch(url, { method: "POST", body: form });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Erro desconhecido" }));
+        throw new Error(err.error);
+      }
+      const blob     = await res.blob();
+      const origName = form.get("audio").name;
+      const outName  = filename(origName);
+      const a        = Object.assign(document.createElement("a"), {
+        href: URL.createObjectURL(blob), download: outName
+      });
+      a.click();
+      URL.revokeObjectURL(a.href);
+      statusEl_.className = `status ${successClass}`;
+      statusEl_.textContent = "✓ download iniciado";
+    } catch (e) {
+      statusEl_.className = "status error";
+      statusEl_.textContent = "✗ " + e.message;
+    } finally {
+      btnEl.disabled = false;
+    }
+  }
+
+  // ── Module 3: Censor ────────────────────────────────────────────────────────
+
+  let file3 = null, selectedSound = "beep";
+
+  setupDropzone("dz3", "file3", (f) => {
+    file3 = f;
+    document.getElementById("fname3").textContent = f.name;
+    updateBtn3();
+  }, "orange");
+
+  document.getElementById("wordInput3").addEventListener("input", updateBtn3);
+
+  function updateBtn3() {
+    const hasFile  = !!file3;
+    const hasWords = document.getElementById("wordInput3").value.trim().length > 0;
+    document.getElementById("btn3").disabled = !(hasFile && hasWords);
+  }
+
+  // Sound buttons — click to select + preview
+  document.querySelectorAll(".sound-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".sound-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      selectedSound = btn.dataset.sound;
+      new Audio(`/sounds/${selectedSound}.mp3`).play().catch(() => {});
+    });
+  });
+
+  document.getElementById("btn3").addEventListener("click", async () => {
+    if (!file3) return;
+    const words     = document.getElementById("wordInput3").value.trim();
+    const form = new FormData();
+    form.append("audio", file3);
+    form.append("words", words);
+    form.append("tolerance", "0");
+    form.append("sound", selectedSound);
+    await submit({
+      url: "/censor", form,
+      btn: "btn3", statusEl: "status3",
+      spinnerClass: "orange", successClass: "success-orange",
+      loadingMsg: "transcrevendo e censurando…",
+      filename: (orig) => `${stem(orig)}_censored${ext(orig)}`
+    });
+  });
+
+  // ── Module 4: Silence Cut ────────────────────────────────────────────────
+
+  let file4 = null;
+
+  setupDropzone("dz4", "file4", (f) => {
+    file4 = f;
+    document.getElementById("fname4").textContent = f.name;
+    document.getElementById("btn4").disabled = false;
+  }, "orange");
+
+  const gapSlider = document.getElementById("gapSlider");
+  const gapVal    = document.getElementById("gapVal");
+  const gapLabel  = document.getElementById("gapLabel");
+  gapSlider.addEventListener("input", () => {
+    const v = parseFloat(gapSlider.value).toFixed(2) + "s";
+    gapVal.textContent = v;
+    gapLabel.textContent = v;
+  });
+
+  document.getElementById("btn4").addEventListener("click", async () => {
+    if (!file4) return;
+    const form = new FormData();
+    form.append("audio", file4);
+    form.append("gap", gapSlider.value);
+    await submit({
+      url: "/silence-cut", form,
+      btn: "btn4", statusEl: "status4",
+      spinnerClass: "orange", successClass: "success-orange",
+      loadingMsg: "detectando silêncios…",
+      filename: (orig) => `${stem(orig)}_nosil${ext(orig)}`
+    });
+  });
+
+  // ── shared helpers ───────────────────────────────────────────────────────
+
+  const stem = name => name.replace(/\.[^.]+$/, "");
+  const ext  = name => { const m = name.match(/\.[^.]+$/); return m ? m[0] : ""; };
+  </script>
+
+</body>
+</html>
