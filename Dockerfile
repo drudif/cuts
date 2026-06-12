@@ -23,7 +23,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Pre-download the whisper model at build time so the first transcription
 # request doesn't pay the ~480MB download (and works without runtime network).
-RUN python3 -c "from faster_whisper import WhisperModel; WhisperModel('small', device='cpu', compute_type='int8')"
+RUN python3 -c "from faster_whisper import WhisperModel; WhisperModel('base', device='cpu', compute_type='int8')"
 
 # Node deps.
 COPY package.json package-lock.json ./

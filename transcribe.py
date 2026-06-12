@@ -10,8 +10,9 @@ import json
 import re
 from faster_whisper import WhisperModel
 
-# Match the previous mlx 'whisper-small-mlx' model for quality parity.
-MODEL_SIZE = "small"
+# 'base' keeps memory low for small Railway containers; bump to 'small'
+# for better accuracy if the host has enough RAM.
+MODEL_SIZE = "base"
 
 
 def normalize(text):
